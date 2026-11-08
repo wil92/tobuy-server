@@ -44,8 +44,10 @@ function createTemperatureService(city, fetchWeather) {
     weatherUrl.searchParams.set('longitude', String(location.longitude));
     weatherUrl.searchParams.set('current', 'temperature_2m');
     weatherUrl.searchParams.set('temperature_unit', 'celsius');
+    weatherUrl.searchParams.set('timezone', 'auto');
     var weather = await getJson(weatherUrl);
-    if (!weather || !weather.current || !Number.isFinite(weather.current.temperature_2m) ||
+    if (!weather || !weather.current || typeof weather.current.time !== 'string' ||
+        !weather.current.time || !Number.isFinite(weather.current.temperature_2m) ||
         !weather.current_units || weather.current_units.temperature_2m !== '°C') {
       throw new Error('Invalid weather response');
     }
@@ -53,6 +55,7 @@ function createTemperatureService(city, fetchWeather) {
     return {
       city: location.name,
       country: typeof location.country === 'string' ? location.country : null,
+      time: weather.current.time,
       temperature: weather.current.temperature_2m,
       unit: '°C'
     };

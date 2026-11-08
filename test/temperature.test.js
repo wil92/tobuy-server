@@ -35,7 +35,10 @@ async function requestTemperature(t, city, fetchWeather, serverApp) {
 }
 
 var location = { name: 'São Paulo', country: 'Brazil', latitude: -23.55, longitude: -46.63 };
-var weather = { current: { temperature_2m: 0 }, current_units: { temperature_2m: '°C' } };
+var weather = {
+  current: { time: '2026-11-08T12:00', temperature_2m: 0 },
+  current_units: { temperature_2m: '°C' }
+};
 
 test('temperature resolves the configured city and returns current Celsius', async function(t) {
   var urls = [];
@@ -46,7 +49,13 @@ test('temperature resolves the configured city and returns current Celsius', asy
   });
   assert.equal(result.status, 200);
   assert.equal(result.headers['cache-control'], 'no-store');
-  assert.deepEqual(result.body, { city: 'São Paulo', country: 'Brazil', temperature: 0, unit: '°C' });
+  assert.deepEqual(result.body, {
+    city: 'São Paulo',
+    country: 'Brazil',
+    time: '2026-11-08T12:00',
+    temperature: 0,
+    unit: '°C'
+  });
   assert.equal(urls[0].origin, 'https://geocoding-api.open-meteo.com');
   assert.equal(urls[0].searchParams.get('name'), 'São Paulo');
   assert.equal(urls[0].searchParams.get('count'), '1');
@@ -55,6 +64,7 @@ test('temperature resolves the configured city and returns current Celsius', asy
   assert.equal(urls[1].searchParams.get('longitude'), '-46.63');
   assert.equal(urls[1].searchParams.get('current'), 'temperature_2m');
   assert.equal(urls[1].searchParams.get('temperature_unit'), 'celsius');
+  assert.equal(urls[1].searchParams.get('timezone'), 'auto');
 });
 
 test('temperature handles missing configuration and unknown cities', async function(t) {
@@ -79,6 +89,9 @@ test('temperature reports upstream failures and invalid responses', async functi
     [response({ results: [{ name: 'City', latitude: 91, longitude: 0 }] })],
     [response({ results: [location] }), response(null, 500)],
     [response({ results: [location] }), response({ current: { temperature_2m: null } })],
+    [response({ results: [location] }), response({
+      current: { time: '', temperature_2m: 20 }, current_units: { temperature_2m: '°C' }
+    })],
     [response({ results: [location] }), response({
       current: { temperature_2m: 20 }, current_units: { temperature_2m: '°F' }
     })]
@@ -107,6 +120,7 @@ test('temperature handles missing country metadata', async function(t) {
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.country, null);
+  assert.equal(result.body.time, weather.current.time);
 });
 
 test('application configures the endpoint from WEATHER_CITY', async function(t) {
@@ -135,5 +149,6 @@ test('application configures the endpoint from WEATHER_CITY', async function(t) 
   var result = await requestTemperature(t, undefined, undefined, configuredApp);
   assert.equal(result.status, 200);
   assert.equal(result.body.city, 'São Paulo');
+  assert.equal(result.body.time, weather.current.time);
   assert.equal(calls, 2);
 });

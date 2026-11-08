@@ -5,15 +5,18 @@ and restart the server. Existing process environment variables override `.env`.
 The endpoint works independently of Google Keep. A missing or blank city does
 not prevent server startup, but the endpoint returns HTTP 503.
 
-`GET /temperature` returns the current air temperature at 2 metres in Celsius:
+`GET /temperature` returns the current local time for the resolved city and
+the current air temperature at 2 metres in Celsius:
 
 ```json
-{"city":"London","country":"United Kingdom","temperature":12.3,"unit":"°C"}
+{"city":"London","country":"United Kingdom","time":"2026-11-08T12:00","temperature":12.3,"unit":"°C"}
 ```
 
 The server uses Open-Meteo's free geocoding and forecast APIs; no API key is
 required. Each request performs a geocoding lookup and a weather lookup. Each
-upstream request has a 5-second timeout. The response identifies the resolved
+upstream request has a 5-second timeout. Open-Meteo's automatic timezone
+selection uses the resolved city coordinates; `time` is the provider's local
+ISO 8601 timestamp (without a UTC offset). The response identifies the resolved
 city and country (or `null` if the provider omits the country). Open-Meteo
 chooses the first matching city, so ambiguous names may resolve to a different
 location than intended. The configured city name is sent to Open-Meteo.
