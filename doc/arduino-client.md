@@ -21,8 +21,9 @@ and WebSocket list messages use this complete JSON object shape:
 }
 ```
 
-The server loads the selected Google Keep note before accepting connections.
-The in-memory revision resets on process restart; the note is the source of
+The server accepts connections while loading the selected Google Keep note.
+Until the first successful sync, clients receive an empty list. The in-memory
+revision resets on process restart; the note is the source of
 list data. Polling changes and confirmed `set_periodic` updates increment the
 revision and are broadcast to connected clients. A repeated state or unknown
 ID refreshes the note and broadcasts the current list without incrementing the

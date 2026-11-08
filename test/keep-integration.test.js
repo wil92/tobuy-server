@@ -2,84 +2,91 @@ var assert = require('node:assert/strict');
 var http = require('node:http');
 var test = require('node:test');
 var WebSocket = require('ws');
-var markdown = require('../services/keep-markdown');
+var checklist = require('../services/keep-checklist');
 var createStore = require('../services/tobuy-store');
 var createKeepSync = require('../services/keep-sync');
 var attachWebSocketServer = require('../services/tobuy-websocket');
 
-var note = '# Shopping\r\n## Periodic\r\n- [ ] Milk\r\n* [X] Coffee\r\n\r\n## Missing\r\n- Bread\r\n';
+var note = [
+  { id: '1', text: '[PERIODIC] Milk', checked: false },
+  { id: '2', text: '[PERIODIC] Coffee', checked: true },
+  { id: '3', text: 'Bread', checked: false },
+  { id: '4', text: 'Bought', checked: true }
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 function fakeClient(initial) {
-  var current = initial;
+  var current = clone(initial);
   var fail = false;
   return {
     read: async function() {
       if (fail) { throw new Error('offline'); }
-      return { text: current };
+      return { items: clone(current) };
     },
-    write: async function(expected, text) {
+    write: async function(expected, id, checked) {
       if (fail) { throw new Error('offline'); }
-      if (current !== expected) { return { text: current, conflict: true }; }
-      current = text;
-      return { text: current, conflict: false };
+      if (JSON.stringify(current) !== JSON.stringify(expected)) {
+        return { items: clone(current), conflict: true };
+      }
+      current.find(function(item) { return item.id === id; }).checked = checked;
+      return { items: clone(current), conflict: false };
     },
-    change: function(text) { current = text; },
-    text: function() { return current; },
+    change: function(items) { current = clone(items); },
+    items: function() { return clone(current); },
     offline: function(value) { fail = value; }
   };
 }
 
-test('Markdown parser recovers recognized entries, preserves content and stable IDs', function() {
-  var parsed = markdown.parse(note);
+test('checklist maps periodic and unchecked missing items with stable item IDs', function() {
+  var parsed = checklist.parse(note);
   assert.deepEqual(parsed.periodic.map(function(item) { return [item.name, item.needed]; }), [
     ['Milk', true], ['Coffee', false]
   ]);
   assert.deepEqual(parsed.missing.map(function(item) { return item.name; }), ['Bread']);
-  var updated = markdown.setPeriodic(note, parsed, parsed.periodic[0].id, false);
-  assert.equal(updated, note.replace('- [ ] Milk', '- [x] Milk'));
-  assert.equal(markdown.parse(updated).periodic[0].id, parsed.periodic[0].id);
-  assert.equal(markdown.parse(updated).periodic[0].needed, false);
-  assert.equal(markdown.setPeriodic(note, parsed, 'unknown', false), note);
+  var changed = clone(note);
+  changed[0].checked = true;
+  changed[0].text = '[PERIODIC] Renamed';
+  changed.reverse();
+  assert.equal(checklist.parse(changed).periodic[1].id, parsed.periodic[0].id);
+  assert.equal(checklist.parse(changed).periodic[1].needed, false);
 });
 
-test('malformed lines and ambiguous duplicates are excluded without damaging valid entries', function() {
-  var text = [
-    'No section',
-    '- [ ] ignored',
-    '## Periodic',
-    '- [ ] Milk',
-    '- [x] Milk',
-    '- [!] invalid',
-    '- [ ] ' + 'é'.repeat(33),
-    '- [ ] Tea',
-    '## Other',
-    '- [ ] ignored',
-    '## Missing',
-    '- Bread',
-    '- Bread',
-    '- Apples',
-    '- [x] ignored'
-  ].join('\n');
-  var parsed = markdown.parse(text);
-  assert.deepEqual(parsed.periodic.map(function(item) { return item.name; }), ['Tea']);
+test('checklist skips invalid entries but allows duplicate names with distinct IDs', function() {
+  var items = [
+    { id: 'a', text: '[PERIODIC] Milk', checked: false },
+    { id: 'b', text: '[PERIODIC] Milk', checked: true },
+    { id: 'c', text: '[PERIODIC] ', checked: false },
+    { id: 'd', text: 'é'.repeat(33), checked: false },
+    { id: 'e', text: 'Apples', checked: false },
+    { id: 'dup', text: 'Duplicate ID', checked: false },
+    { id: 'dup', text: 'Duplicate ID 2', checked: false },
+    { id: 'f', text: 'bad state', checked: 'false' }
+  ];
+  var parsed = checklist.parse(items);
+  assert.equal(parsed.periodic.length, 2);
+  assert.notEqual(parsed.periodic[0].id, parsed.periodic[1].id);
   assert.deepEqual(parsed.missing.map(function(item) { return item.name; }), ['Apples']);
-  assert.equal(markdown.parse('not a list').periodic.length, 0);
+  assert.equal(parsed.skipped, 5);
+  assert.equal(checklist.parse([]).periodic.length, 0);
 });
 
-test('parser enforces item count and serialized UTF-8 message limit', function() {
-  var many = '## Periodic\n' + Array.from({ length: 70 }, function(_, index) {
-    return '- [ ] ' + String(index).padStart(2, '0') + 'é'.repeat(30);
-  }).join('\n');
-  var parsed = markdown.parse(many);
+test('checklist enforces item count and serialized UTF-8 message limit', function() {
+  var many = Array.from({ length: 70 }, function(_, index) {
+    return { id: String(index), text: '[PERIODIC] ' + String(index).padStart(2, '0') + 'é'.repeat(30), checked: false };
+  });
+  var parsed = checklist.parse(many);
   var store = createStore({ periodic: parsed.periodic, missing: parsed.missing });
   assert.ok(parsed.periodic.length < 64);
   assert.ok(Buffer.byteLength(store.serialize(), 'utf8') <= 8192);
-  assert.equal(markdown.parse('## Missing\n' + Array.from({ length: 70 }, function(_, index) {
-    return '- ' + index;
-  }).join('\n')).missing.length, 64);
+  assert.equal(checklist.parse(many.map(function(item, index) {
+    return { id: item.id, text: String(index), checked: false };
+  })).missing.length, 64);
 });
 
-test('sync writes only the selected marker and publishes after remote confirmation', async function() {
+test('sync writes only the selected periodic item after remote confirmation', async function() {
   var store = createStore();
   var client = fakeClient(note);
   var sync = createKeepSync(store, client);
@@ -90,12 +97,14 @@ test('sync writes only the selected marker and publishes after remote confirmati
   assert.equal(result.changed, true);
   assert.equal(result.snapshot.revision, original.revision + 1);
   assert.equal(result.snapshot.periodic[0].needed, false);
-  assert.equal(client.text(), note.replace('- [ ] Milk', '- [x] Milk'));
+  var expected = clone(note);
+  expected[0].checked = true;
+  assert.deepEqual(client.items(), expected);
   assert.equal((await sync.setPeriodic(id, false)).changed, false);
   assert.equal((await sync.setPeriodic('unknown', true)).changed, false);
 });
 
-test('sync preserves the last snapshot on failure and refuses stale writes', async function() {
+test('sync retains the last snapshot on errors and refuses stale writes', async function() {
   var store = createStore();
   var client = fakeClient(note);
   var sync = createKeepSync(store, client);
@@ -106,10 +115,11 @@ test('sync preserves the last snapshot on failure and refuses stale writes', asy
   await assert.rejects(sync.refresh(), /offline/);
   assert.deepEqual(store.getSnapshot(), initial);
   client.offline(false);
-  var edited = note.replace('Bread', 'Apples');
+  var edited = clone(note);
+  edited[2].text = 'Apples';
   client.change(edited);
   await sync.setPeriodic(initial.periodic[0].id, false);
-  assert.equal(client.text(), edited);
+  assert.deepEqual(client.items(), edited);
   assert.equal(store.getSnapshot().periodic[0].needed, true);
   assert.equal(store.getSnapshot().missing[0].name, 'Apples');
 });
@@ -121,23 +131,27 @@ test('sync serializes concurrent changes without overwriting each other', async 
   await sync.refresh();
   var items = store.getSnapshot().periodic;
   await Promise.all([sync.setPeriodic(items[0].id, false), sync.setPeriodic(items[1].id, true)]);
-  assert.equal(client.text(), note.replace('- [ ] Milk', '- [x] Milk').replace('* [X] Coffee', '* [ ] Coffee'));
+  var expected = clone(note);
+  expected[0].checked = true;
+  expected[1].checked = false;
+  assert.deepEqual(client.items(), expected);
   assert.deepEqual(store.getSnapshot().periodic.map(function(item) { return item.needed; }), [false, true]);
 });
 
-test('WebSocket does not confirm a change until the remote write succeeds', async function(t) {
+test('WebSocket confirms only successful remote writes', async function(t) {
   var store = createStore();
-  var text = note;
+  var items = clone(note);
   var resolveWrite;
   var failWrite = false;
   var client = {
-    read: async function() { return { text: text }; },
-    write: function(expected, next) {
-      if (failWrite) {
-        return Promise.reject(new Error('offline'));
-      }
+    read: async function() { return { items: clone(items) }; },
+    write: function(expected, id, checked) {
+      if (failWrite) { return Promise.reject(new Error('offline')); }
       return new Promise(function(resolve) {
-        resolveWrite = function() { text = next; resolve({ text: text, conflict: false }); };
+        resolveWrite = function() {
+          items.find(function(item) { return item.id === id; }).checked = checked;
+          resolve({ items: clone(items), conflict: false });
+        };
       });
     }
   };

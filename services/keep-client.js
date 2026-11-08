@@ -38,7 +38,7 @@ function createKeepClient(python, env) {
         processChild.kill();
         return;
       }
-      if (!response || typeof response !== 'object' || response.error || typeof response.text !== 'string') {
+      if (!response || typeof response !== 'object' || response.error || !Array.isArray(response.items)) {
         var reason = response && typeof response.error === 'string' ? response.error : 'invalid response';
         fail(new Error('Google Keep helper failed: ' + reason));
         child = null;
@@ -51,9 +51,9 @@ function createKeepClient(python, env) {
       initial = false;
       current.resolve(response);
     });
-    processChild.on('error', function() {
+    processChild.on('error', function(error) {
       if (child === processChild) {
-        fail(new Error('Could not start Google Keep helper'));
+        fail(new Error('Could not start Google Keep helper: ' + (error.code || error.message)));
         child = null;
         processChild.kill();
       }
@@ -74,7 +74,7 @@ function createKeepClient(python, env) {
     });
   }
 
-  function request(operation, expected, text) {
+  function request(operation, expected, id, checked) {
     if (stopped) {
       return Promise.reject(new Error('Google Keep helper is closed'));
     }
@@ -94,13 +94,13 @@ function createKeepClient(python, env) {
         }
       }, initial ? 60000 : 8000);
       pending = { resolve: resolve, reject: reject, timer: timer };
-      processChild.stdin.write(JSON.stringify({ operation: operation, expected: expected, text: text }) + '\n');
+      processChild.stdin.write(JSON.stringify({ operation: operation, expected: expected, id: id, checked: checked }) + '\n');
     });
   }
 
   return {
     read: function() { return request('read'); },
-    write: function(expected, text) { return request('write', expected, text); },
+    write: function(expected, id, checked) { return request('write', expected, id, checked); },
     close: function() {
       stopped = true;
       fail(new Error('Google Keep helper closed'));

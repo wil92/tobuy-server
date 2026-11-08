@@ -15,8 +15,8 @@ npm start
 ```
 
 Before starting, configure the selected note and credentials in `.env` as
-described in the [Google Keep guide](google-keep.md). The server will not
-listen until its first Keep sync succeeds.
+described in the [Google Keep guide](google-keep.md). The server listens
+while the initial Keep sync is retried; its list is empty until a sync succeeds.
 
 The server listens on port `3000` by default. Override it with, for example,
 `PORT=3001 npm start`. The Arduino API is at `http://localhost:3000/tobuy` and
@@ -50,7 +50,7 @@ node --check routes/tobuy.js
 node --check services/tobuy-store.js
 node --check services/tobuy-websocket.js
 node --check services/keep-client.js
-node --check services/keep-markdown.js
+node --check services/keep-checklist.js
 node --check services/keep-sync.js
 .venv/bin/python -m py_compile services/keep-worker.py
 ```

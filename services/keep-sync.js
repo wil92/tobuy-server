@@ -1,7 +1,7 @@
-var markdown = require('./keep-markdown');
+var checklist = require('./keep-checklist');
 
 function createKeepSync(store, client) {
-  var text;
+  var items;
   var parsed;
   var queue = Promise.resolve();
 
@@ -11,13 +11,13 @@ function createKeepSync(store, client) {
     return result;
   }
 
-  function publish(nextText) {
-    var next = markdown.parse(nextText);
+  function publish(nextItems) {
+    var next = checklist.parse(nextItems);
     var changed = store.replaceLists({ periodic: next.periodic, missing: next.missing });
-    if (nextText !== text && next.skipped > 0) {
+    if (JSON.stringify(nextItems) !== JSON.stringify(items) && next.skipped > 0) {
       console.error('Google Keep note: skipped ' + next.skipped + ' invalid, ambiguous, or oversized list entries');
     }
-    text = nextText;
+    items = nextItems;
     parsed = next;
     return { changed: changed, snapshot: store.getSnapshot() };
   }
@@ -25,7 +25,7 @@ function createKeepSync(store, client) {
   function refresh() {
     return enqueue(function() {
       return client.read().then(function(response) {
-        return publish(response.text);
+        return publish(response.items);
       });
     });
   }
@@ -35,15 +35,18 @@ function createKeepSync(store, client) {
       var item = parsed && parsed.periodic.find(function(candidate) { return candidate.id === id; });
       if (!item || item.needed === needed || store.getSnapshot().revision === 4294967295) {
         return client.read().then(function(response) {
-          return publish(response.text);
+          return publish(response.items);
         });
       }
-      var updated = markdown.setPeriodic(text, parsed, id, needed);
-      return client.write(text, updated).then(function(response) {
-        if (response.conflict || response.text !== updated) {
+      return client.write(items, parsed.targets[id], !needed).then(function(response) {
+        var target = response.items.find(function(candidate) {
+          return candidate.id === parsed.targets[id];
+        });
+        if (response.conflict || !target || target.checked !== !needed ||
+            typeof target.text !== 'string' || !target.text.startsWith('[PERIODIC]')) {
           console.error('Google Keep note changed during an Arduino update; refreshed without confirming the request');
         }
-        return publish(response.text);
+        return publish(response.items);
       });
     });
   }

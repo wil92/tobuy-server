@@ -30,40 +30,45 @@ only to the required note where practical.
 
 ## Note format
 
-Use a Keep **text note**, not a native Keep checklist. Enter Markdown text:
+Use a native Google Keep **checklist**. Prefix periodic item text with the
+exact, case-sensitive marker `[PERIODIC]`:
 
-```markdown
-## Periodic
-- [ ] Milk
-- [x] Coffee
-
-## Missing
-- Bread
-- Apples
+```text
+unchecked: [PERIODIC] Milk
+checked:   [PERIODIC] Coffee
+unchecked: Bread
+checked:   Purchased item
 ```
 
-In the periodic section, unchecked means needed and checked means not needed.
-Only periodic switches can be changed from the Arduino. Edit the note directly
-to add, rename, or remove items. Missing items are ordinary bullets; they do
-not have switches. `-`, `*`, and `+` bullets and `[x]` or `[X]` checked
-markers are accepted. Heading names are case-insensitive.
+For periodic items, unchecked means needed and checked means not needed. The
+marker is removed from the name displayed on the Arduino. Unchecked items
+without the marker appear in the missing list; checked non-periodic items are
+excluded. Only periodic switches can be changed from the Arduino. Edit the
+checklist directly to add, rename, or remove items. Indented items are treated
+as individual entries.
 
-The parser salvages recognized entries and ignores other content, malformed
-bullets, names over 64 UTF-8 bytes, and all instances of duplicate names within
-the same section. If no entries are recognizable the list is empty. The
-server logs the number of skipped bullet entries without logging their
-contents. It also skips entries exceeding the Arduino protocol's 64-item or
-8192-byte message limits. IDs are derived from the section and exact item
-name, so they survive checkbox changes and reordering but change on rename.
+The server skips entries with empty names or names over 64 UTF-8 bytes, as
+well as entries exceeding the Arduino protocol's 64-item or 8192-byte message
+limits. It logs the number skipped without logging their contents. Duplicate
+names are allowed when they are separate checklist items. IDs derive from
+Keep's item identifiers and remain stable across renames and reordering; a
+deleted and recreated item gets a new ID.
 
 ## Synchronization and limitations
 
-The initial sync must succeed before the server listens. Afterward the server
-polls the note and broadcasts changes. Device updates are serialized, sync the
-note again, and change only the checkbox character if the whole note still
-matches the last version read. Otherwise the server refreshes the current
+The server listens immediately and attempts an initial sync. If it fails, the
+server logs the error and retries at the configured polling interval. Until
+the first successful sync, HTTP and WebSocket clients receive an empty list;
+that list does not mean the Keep note is empty. Successful syncs broadcast
+changes. Device updates are serialized, sync the
+checklist again, and change only the selected item's checked state if the
+item IDs, text, checked states, and order still match the last version read.
+Otherwise the server refreshes the current
 note and rejects the stale request; try the switch again. Errors are logged,
 the last known list remains available, and failed writes are not confirmed.
+Logs include exception types and diagnostic messages; configured credentials,
+note identifiers, checklist text passed in update requests, and URLs are redacted.
+Treat logs as potentially sensitive and limit access to them.
 If a request times out after Google accepted it, a later poll may still reveal
 the change. Keep API failures can require restarting the helper, and recovery
 may exceed the Arduino's 10-second confirmation timeout.

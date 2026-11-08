@@ -5,8 +5,8 @@ protocol for the Arduino client.
 
 ## Application
 
-- `bin/www` loads `.env`, starts the Keep integration, and listens on `PORT`
-  (default `3000`) after the initial sync. It also accepts a named pipe.
+- `bin/www` loads `.env`, listens on `PORT` (default `3000`), and starts and
+  retries the Keep integration. It also accepts a named pipe.
 - `app.js` mounts the Arduino HTTP route and exposes an app factory that accepts
   a list store for isolated integration tests.
 - `routes/health.js` handles `GET /health` with a JSON `{ "status": "ok" }`
@@ -18,8 +18,8 @@ protocol for the Arduino client.
 - `services/tobuy-websocket.js` attaches the `/ws` endpoint to the HTTP server,
   forwards periodic-item requests, broadcasts list changes, and uses the
   `ws` library's automatic ping/pong handling.
-- `services/keep-markdown.js` extracts protocol items from the selected text
-  note and modifies only the relevant checkbox character.
+- `services/keep-checklist.js` extracts protocol items from the selected
+  checklist, maps item IDs, and enforces protocol limits.
 - `services/keep-sync.js` serializes polls and Arduino changes, publishing only
   confirmed Keep state. `services/keep-client.js` manages the Python helper;
   `services/keep-worker.py` uses the unofficial `gkeepapi` client.

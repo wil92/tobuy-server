@@ -34,6 +34,7 @@ var keepClient = createKeepClient(python, process.env);
 var keepSync = createKeepSync(app.locals.tobuyStore, keepClient);
 var pollTimer;
 var pollPending = false;
+var shuttingDown = false;
 
 /**
  * Get port from environment and store in Express.
@@ -60,27 +61,27 @@ server.on('close', function() {
   keepClient.close();
 });
 
-keepSync.refresh().then(function() {
-  server.listen(port);
-  pollTimer = setInterval(function() {
-    if (pollPending) {
-      return;
+function refreshKeep() {
+  if (pollPending || shuttingDown) {
+    return;
+  }
+  pollPending = true;
+  keepSync.refresh().catch(function(error) {
+    if (!shuttingDown) {
+      console.error('Google Keep sync failed:', error.message);
     }
-    pollPending = true;
-    keepSync.refresh().catch(function(error) {
-      console.error('Google Keep refresh failed:', error.message);
-    }).finally(function() {
-      pollPending = false;
-    });
-  }, interval);
-}).catch(function(error) {
-  console.error('Google Keep initial sync failed:', error.message);
-  keepClient.close();
-  process.exitCode = 1;
-});
+  }).finally(function() {
+    pollPending = false;
+  });
+}
+
+server.listen(port);
+refreshKeep();
+pollTimer = setInterval(refreshKeep, interval);
 
 ['SIGINT', 'SIGTERM'].forEach(function(signal) {
   process.on(signal, function() {
+    shuttingDown = true;
     clearInterval(pollTimer);
     keepClient.close();
     webSocketServer.clients.forEach(function(client) { client.terminate(); });
