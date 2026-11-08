@@ -37,6 +37,17 @@ function getJson(url) {
   });
 }
 
+function getStatus(url) {
+  return new Promise(function(resolve, reject) {
+    http.get(url, function(response) {
+      response.resume();
+      response.on('end', function() {
+        resolve(response.statusCode);
+      });
+    }).on('error', reject);
+  });
+}
+
 function connect(url) {
   return new Promise(function(resolve, reject) {
     var socket = new WebSocket(url);
@@ -281,4 +292,7 @@ test('Arduino HTTP endpoint returns an empty list from a fresh store', async fun
     periodic: [],
     missing: []
   });
+
+  assert.equal(await getStatus('http://127.0.0.1:' + port + '/'), 404);
+  assert.equal(await getStatus('http://127.0.0.1:' + port + '/users'), 404);
 });
