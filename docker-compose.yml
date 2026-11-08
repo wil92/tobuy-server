@@ -2,6 +2,7 @@ services:
   server:
     build: .
     restart: unless-stopped
+    container_name: tobuy-server
     env_file:
       - .env
     environment:
