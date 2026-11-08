@@ -13,8 +13,8 @@ function response(data, status) {
   };
 }
 
-async function requestTemperature(t, city, fetchWeather, serverApp) {
-  var server = http.createServer(serverApp || app.createApp(undefined, createTemperatureService(city, fetchWeather)));
+async function requestTemperature(t, city, fetchWeather, serverApp, now) {
+  var server = http.createServer(serverApp || app.createApp(undefined, createTemperatureService(city, fetchWeather, now)));
   await new Promise(function(resolve, reject) {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -36,6 +36,7 @@ async function requestTemperature(t, city, fetchWeather, serverApp) {
 
 var location = { name: 'São Paulo', country: 'Brazil', latitude: -23.55, longitude: -46.63 };
 var weather = {
+  timezone: 'America/Sao_Paulo',
   current: { time: '2026-11-08T12:00', temperature_2m: 0 },
   current_units: { temperature_2m: '°C' }
 };
@@ -46,13 +47,13 @@ test('temperature resolves the configured city and returns current Celsius', asy
     assert.ok(options.signal instanceof AbortSignal);
     urls.push(url);
     return response(urls.length === 1 ? { results: [location] } : weather);
-  });
+  }, undefined, function() { return new Date('2026-11-09T01:57:30Z'); });
   assert.equal(result.status, 200);
   assert.equal(result.headers['cache-control'], 'no-store');
   assert.deepEqual(result.body, {
     city: 'São Paulo',
     country: 'Brazil',
-    time: '2026-11-08T12:00',
+    time: '2026-11-08T22:57',
     temperature: 0,
     unit: '°C'
   });
@@ -90,10 +91,22 @@ test('temperature reports upstream failures and invalid responses', async functi
     [response({ results: [location] }), response(null, 500)],
     [response({ results: [location] }), response({ current: { temperature_2m: null } })],
     [response({ results: [location] }), response({
+      timezone: 'UTC',
       current: { time: '', temperature_2m: 20 }, current_units: { temperature_2m: '°C' }
     })],
     [response({ results: [location] }), response({
-      current: { temperature_2m: 20 }, current_units: { temperature_2m: '°F' }
+      timezone: 'UTC',
+      current: { time: '2026-11-08T12:00', temperature_2m: 20 },
+      current_units: { temperature_2m: '°F' }
+    })],
+    [response({ results: [location] }), response({
+      current: { time: '2026-11-08T12:00', temperature_2m: 20 },
+      current_units: { temperature_2m: '°C' }
+    })],
+    [response({ results: [location] }), response({
+      timezone: 'Invalid/Timezone',
+      current: { time: '2026-11-08T12:00', temperature_2m: 20 },
+      current_units: { temperature_2m: '°C' }
     })]
   ];
   for (var entry of cases) {
@@ -117,10 +130,31 @@ test('temperature handles missing country metadata', async function(t) {
     return response(calls === 1
       ? { results: [{ name: 'City', latitude: 0, longitude: 0 }] }
       : weather);
-  });
+  }, undefined, function() { return new Date('2026-11-09T01:57:30Z'); });
   assert.equal(result.status, 200);
   assert.equal(result.body.country, null);
-  assert.equal(result.body.time, weather.current.time);
+  assert.equal(result.body.time, '2026-11-08T22:57');
+});
+
+test('temperature uses the city timezone at the current instant', async function(t) {
+  var cases = [
+    ['Europe/London', '2026-03-29T00:59:30Z', '2026-03-29T00:59'],
+    ['Europe/London', '2026-03-29T01:00:30Z', '2026-03-29T02:00'],
+    ['Asia/Kathmandu', '2026-11-08T18:30:30Z', '2026-11-09T00:15']
+  ];
+  for (var entry of cases) {
+    var calls = 0;
+    var result = await requestTemperature(t, 'City', async function() {
+      calls += 1;
+      return response(calls === 1 ? { results: [location] } : {
+        timezone: entry[0],
+        current: weather.current,
+        current_units: weather.current_units
+      });
+    }, undefined, function() { return new Date(entry[1]); });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.time, entry[2]);
+  }
 });
 
 test('application configures the endpoint from WEATHER_CITY', async function(t) {
@@ -135,7 +169,11 @@ test('application configures the endpoint from WEATHER_CITY', async function(t) 
       if (calls === 1) {
         assert.equal(url.searchParams.get('name'), 'Configured city');
       }
-      return response(calls === 1 ? { results: [location] } : weather);
+      return response(calls === 1 ? { results: [location] } : {
+        timezone: 'UTC',
+        current: weather.current,
+        current_units: weather.current_units
+      });
     };
     configuredApp = app.createApp();
   } finally {
@@ -146,9 +184,11 @@ test('application configures the endpoint from WEATHER_CITY', async function(t) 
     }
     global.fetch = previousFetch;
   }
+  var before = new Date().toISOString().slice(0, 16);
   var result = await requestTemperature(t, undefined, undefined, configuredApp);
+  var after = new Date().toISOString().slice(0, 16);
   assert.equal(result.status, 200);
   assert.equal(result.body.city, 'São Paulo');
-  assert.equal(result.body.time, weather.current.time);
+  assert.ok(result.body.time >= before && result.body.time <= after);
   assert.equal(calls, 2);
 });
