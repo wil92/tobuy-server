@@ -9,6 +9,8 @@ protocol for the Arduino client.
   (default `3000`). It also accepts a named pipe.
 - `app.js` mounts the Arduino HTTP route and exposes an app factory that accepts
   a list store for isolated integration tests.
+- `routes/health.js` handles `GET /health` with a JSON `{ "status": "ok" }`
+  response for service liveness checks.
 - `routes/tobuy.js` handles `GET /tobuy` and returns the shared revisioned
   list document.
 - `services/tobuy-store.js` owns the in-memory periodic and missing lists,

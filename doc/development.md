@@ -11,8 +11,9 @@ npm start
 
 The server listens on port `3000` by default. Override it with, for example,
 `PORT=3001 npm start`. The Arduino API is at `http://localhost:3000/tobuy` and
-its WebSocket endpoint is `ws://localhost:3000/ws`. Set
-`DEBUG=tobuy-server:server` to see the server's listening message.
+its WebSocket endpoint is `ws://localhost:3000/ws`. Check server liveness at
+`http://localhost:3000/health`. Set `DEBUG=tobuy-server:server` to see the
+server's listening message.
 
 No Node.js version is pinned in the repository. Keep `package-lock.json` in
 sync with any dependency changes and use `npm ci` for a reproducible install.
@@ -35,6 +36,7 @@ For a syntax-only check of the application files, run:
 ```sh
 node --check app.js
 node --check bin/www
+node --check routes/health.js
 node --check routes/tobuy.js
 node --check services/tobuy-store.js
 node --check services/tobuy-websocket.js

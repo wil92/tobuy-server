@@ -296,3 +296,19 @@ test('Arduino HTTP endpoint returns an empty list from a fresh store', async fun
   assert.equal(await getStatus('http://127.0.0.1:' + port + '/'), 404);
   assert.equal(await getStatus('http://127.0.0.1:' + port + '/users'), 404);
 });
+
+test('health endpoint returns an OK status', async function(t) {
+  var server = http.createServer(app.createApp(createStore()));
+  var port = await listen(server);
+
+  t.after(function() {
+    return new Promise(function(resolve) {
+      server.close(resolve);
+    });
+  });
+
+  var response = await getJson('http://127.0.0.1:' + port + '/health');
+  assert.equal(response.statusCode, 200);
+  assert.match(response.contentType, /^application\/json; charset=utf-8$/);
+  assert.deepEqual(response.json, { status: 'ok' });
+});
