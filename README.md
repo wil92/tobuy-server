@@ -15,6 +15,7 @@ limitations.
 ## Documentation
 
 - [Development](doc/development.md): setup, commands, and validation gaps.
+- [Docker deployment](doc/docker.md): home server deployment with Compose.
 - [Architecture](doc/architecture.md): current application and routes.
 - [Arduino client integration](doc/arduino-client.md): required protocol and
   implementation status.

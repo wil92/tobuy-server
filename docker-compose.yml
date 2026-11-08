@@ -1,0 +1,10 @@
+services:
+  server:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "${PORT:-3000}"
+    ports:
+      - "${HOST_PORT:-3000}:${PORT:-3000}"
