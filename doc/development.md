@@ -19,18 +19,27 @@ sync with any dependency changes and use `npm ci` for a reproducible install.
 
 ## Build and tests
 
-`package.json` currently defines only `npm start`: there is no build script,
-test script, test suite, or configured linter. The server runs JavaScript
-directly; there is no compilation step. Check the current scripts with
-`npm run` before choosing validation commands.
+The test suite uses Node.js's built-in test runner (Node.js 18 or newer):
 
-For a syntax-only check of the current application files, run:
+```sh
+npm test
+```
+
+`package.json` defines `npm start` and `npm test`; there is no separate build
+script or configured linter. The server runs JavaScript directly, so there is
+no compilation step. Check the current scripts with `npm run` before choosing
+validation commands.
+
+For a syntax-only check of the application files, run:
 
 ```sh
 node --check app.js
 node --check bin/www
 node --check routes/index.js
 node --check routes/users.js
+node --check routes/tobuy.js
+node --check services/tobuy-store.js
+node --check services/tobuy-websocket.js
 ```
 
 These checks do not replace a build or automated tests. For changes, add or

@@ -3,16 +3,14 @@
 The intended client is the
 [To Buy Arduino ESP32 firmware](https://github.com/wil92/tobuy-arduino). Its
 [server protocol](https://github.com/wil92/tobuy-arduino/blob/master/doc/server-protocol.md)
-is the authoritative contract; check it before implementing or changing the
-integration. The current server does **not** implement this contract.
+is the authoritative contract; check it before changing the integration.
 
-The client expects an `http://host[:port]` base URL, connects to
-`ws://host[:port]/ws`, and fetches `GET /tobuy` after connecting and each
-reconnect. The device defaults to port 80 when none is specified, while this
-server defaults to 3000.
+## Implemented protocol
 
-The HTTP response and each WebSocket list update must contain the same complete
-JSON object shape:
+Configure the client with an `http://host[:port]` base URL. The server provides
+`GET /tobuy` and `ws://host[:port]/ws`; the server defaults to port 3000 and
+the device defaults to port 80 when no port is specified. The HTTP response
+and WebSocket list messages use this complete JSON object shape:
 
 ```json
 {
@@ -23,24 +21,22 @@ JSON object shape:
 }
 ```
 
-The contract requires an unsigned 32-bit revision that increases on changes
-and is consistent across HTTP and WebSocket updates for a connection. Equal
-revisions must describe identical lists; after reconnect the device accepts a
-fresh revision sequence. Both arrays are required, with at most 64 items
-combined. IDs must be unique across both arrays and at most 32 UTF-8 bytes;
-names must be nonempty and at most 64 UTF-8 bytes. IDs must also be nonempty,
-and `needed` must be a boolean on periodic items. Each list message must fit
-within 8192 UTF-8 bytes and be sent as a single, unfragmented WebSocket text
-message.
+Each process starts with empty in-memory `periodic` and `missing` arrays at
+revision 0. Lists are not persisted, and this server does not yet provide a
+public API to add or remove items. Internal server integrations can update the
+shared list store; changes increment the revision and are broadcast to
+connected clients. A `set_periodic` update applies an idempotent desired state
+and broadcasts the resulting complete list. Repeating the current state or
+requesting an unknown ID returns the current list without incrementing the
+revision.
 
-The device sends `{"type":"set_periodic","id":"milk","needed":true}` for a
-touchscreen change. The server should apply the desired state idempotently and
-broadcast the complete list with a newer revision when changed, or the current
-list when already in that state. It must answer WebSocket ping frames with
-pongs. The device waits for a confirming list and refetches if confirmation
-does not arrive within 10 seconds.
+The server validates the protocol's list limits: unsigned 32-bit revisions,
+at most 64 combined items, nonempty unique IDs of at most 32 UTF-8 bytes,
+nonempty names of at most 64 UTF-8 bytes, boolean `needed` values on periodic
+items, and list messages no larger than 8192 UTF-8 bytes. WebSocket requests
+must be text messages with the supported `set_periodic` shape. The WebSocket
+server responds to ping frames with pongs.
 
 The client protocol is unauthenticated and unencrypted (`http://` and `ws://`).
 Use it only on a trusted network: other network participants can read or
-change the list and impersonate the server. Do not document the protocol as
-implemented or secure until the server actually provides it.
+change the list and impersonate the server.

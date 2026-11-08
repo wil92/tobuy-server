@@ -5,10 +5,10 @@ An Express/Node.js server intended to support the
 display. The Arduino client fetches the list over HTTP, receives updates over
 WebSocket, and sends periodic-item changes from its touchscreen.
 
-The server is currently an Express scaffold: it serves placeholder pages, not
-the shopping-list API or WebSocket protocol. It cannot yet serve the Arduino
-client. See the [client integration guide](doc/arduino-client.md) for the
-required contract and its security limitations.
+The server provides the Arduino client's revisioned list endpoint and
+WebSocket protocol. Lists currently start empty in memory and are not
+persisted. See the [client integration guide](doc/arduino-client.md) for the
+protocol details and its security limitations.
 
 ## Documentation
 
