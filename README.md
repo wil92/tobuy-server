@@ -25,3 +25,16 @@ limitations.
 - [Coding rules](doc/coding-rules.md): conventions for changes and tests.
 - [Express Senior agent](.github/agents/express-senior.agent.md): project
   workflows and skills.
+
+## Build and publish the Docker image
+
+Create a `tobuy-server` repository in Docker Hub, then from the repository root
+log in, build the image tagged with your Docker Hub username, and push it:
+
+```sh
+docker login
+docker build -t ggjnez92/tobuy_server:<current-version> .
+docker build -t ggjnez92/tobuy_server:latest .
+docker push ggjnez92/tobuy_server:<current-version>
+docker push ggjnez92/tobuy_server:latest
+```
