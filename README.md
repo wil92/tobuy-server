@@ -6,7 +6,8 @@ display. The Arduino client fetches the list over HTTP, receives updates over
 WebSocket, and sends periodic-item changes from its touchscreen.
 
 The server reads a selected Google Keep note and exposes the Arduino client's
-revisioned list endpoint and WebSocket protocol. See the
+revisioned list endpoint and WebSocket protocol. Missing items can be marked
+done in Keep through the server's HTTP API. See the
 [Google Keep guide](doc/google-keep.md) for setup and the
 [client integration guide](doc/arduino-client.md) for protocol and security
 limitations.

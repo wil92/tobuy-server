@@ -30,6 +30,8 @@ ID refreshes the note and broadcasts the current list without incrementing the
 revision unless the note changed. On a failed write the last known list is
 broadcast without confirming the requested state. Configure the note format,
 credentials, and polling as described in the [Google Keep guide](google-keep.md).
+The separate HTTP missing-item completion endpoint also broadcasts confirmed
+list changes; it is not part of the Arduino WebSocket request protocol.
 
 The server validates the protocol's list limits: unsigned 32-bit revisions,
 at most 64 combined items, nonempty unique IDs of at most 32 UTF-8 bytes,

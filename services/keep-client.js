@@ -101,6 +101,7 @@ function createKeepClient(python, env) {
   return {
     read: function() { return request('read'); },
     write: function(expected, id, checked) { return request('write', expected, id, checked); },
+    completeMissing: function(expected, id) { return request('complete_missing', expected, id, true); },
     close: function() {
       stopped = true;
       fail(new Error('Google Keep helper closed'));

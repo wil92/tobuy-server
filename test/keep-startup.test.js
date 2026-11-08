@@ -72,6 +72,28 @@ test('server starts with the selected Keep note and persists Arduino updates', a
     }).on('error', reject);
   });
   assert.deepEqual(response, updated);
+  var removed = new Promise(function(resolve) {
+    socket.once('message', function(data) { resolve(JSON.parse(data)); });
+  });
+  var deletion = await new Promise(function(resolve, reject) {
+    var request = http.request({
+      hostname: '127.0.0.1',
+      port: port,
+      method: 'DELETE',
+      path: '/tobuy/missing/' + encodeURIComponent(updated.missing[0].id)
+    }, function(res) {
+      var body = '';
+      res.setEncoding('utf8');
+      res.on('data', function(chunk) { body += chunk; });
+      res.on('end', function() { resolve({ status: res.statusCode, body: JSON.parse(body) }); });
+    });
+    request.on('error', reject);
+    request.end();
+  });
+  assert.equal(deletion.status, 200);
+  assert.deepEqual(deletion.body, await removed);
+  assert.deepEqual(deletion.body.missing, []);
+  assert.equal(deletion.body.periodic[0].needed, false);
 });
 
 test('server remains available and retries a failed initial Keep sync', async function(t) {

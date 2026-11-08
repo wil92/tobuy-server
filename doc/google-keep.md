@@ -43,9 +43,10 @@ checked:   Purchased item
 For periodic items, unchecked means needed and checked means not needed. The
 marker is removed from the name displayed on the Arduino. Unchecked items
 without the marker appear in the missing list; checked non-periodic items are
-excluded. Only periodic switches can be changed from the Arduino. Edit the
-checklist directly to add, rename, or remove items. Indented items are treated
-as individual entries.
+excluded. Only periodic switches can be changed from the Arduino. To mark a
+missing item done, use the HTTP endpoint below. Edit the checklist directly to
+add, rename, or permanently delete items. Indented items are treated as
+individual entries.
 
 The server skips entries with empty names or names over 64 UTF-8 bytes, as
 well as entries exceeding the Arduino protocol's 64-item or 8192-byte message
@@ -54,17 +55,34 @@ names are allowed when they are separate checklist items. IDs derive from
 Keep's item identifiers and remain stable across renames and reordering; a
 deleted and recreated item gets a new ID.
 
+## Completing a missing item
+
+Send `DELETE /tobuy/missing/{id}` using the ID from the `missing` array in
+`GET /tobuy`. This marks the corresponding non-periodic checklist item checked;
+it does not delete the item from the Google Keep note. On confirmation, the
+endpoint returns HTTP 200 and the complete updated list object, and the change
+is broadcast to WebSocket clients. A repeat request returns 404 because checked
+items are no longer in the missing list. Periodic IDs cannot be completed
+through this endpoint.
+
+The endpoint returns JSON errors: 400 for an ID over 32 UTF-8 bytes, 404 when
+the ID is not in the latest synchronized missing list, 409 if the note changed
+or the write could not be confirmed, 502 on a Keep failure, and 503 before the
+first successful sync or when the list revision is exhausted. After a 409,
+fetch the list before trying again. A timed-out write may still take effect
+later. The endpoint is unauthenticated and unencrypted; use a trusted network.
+
 ## Synchronization and limitations
 
 The server listens immediately and attempts an initial sync. If it fails, the
 server logs the error and retries at the configured polling interval. Until
 the first successful sync, HTTP and WebSocket clients receive an empty list;
 that list does not mean the Keep note is empty. Successful syncs broadcast
-changes. Device updates are serialized, sync the
+changes. Device updates and missing-item completions are serialized, sync the
 checklist again, and change only the selected item's checked state if the
 item IDs, text, checked states, and order still match the last version read.
 Otherwise the server refreshes the current
-note and rejects the stale request; try the switch again. Errors are logged,
+note and rejects the stale request; refresh and retry if appropriate. Errors are logged,
 the last known list remains available, and failed writes are not confirmed.
 Logs include exception types and diagnostic messages; configured credentials,
 note identifiers, checklist text passed in update requests, and URLs are redacted.

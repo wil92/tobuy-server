@@ -51,7 +51,32 @@ function createKeepSync(store, client) {
     });
   }
 
-  return { refresh: refresh, setPeriodic: setPeriodic };
+  function completeMissing(id) {
+    return enqueue(function() {
+      if (!parsed || store.getSnapshot().revision === 4294967295) {
+        return { status: 'unavailable' };
+      }
+      var item = parsed.missing.find(function(candidate) { return candidate.id === id; });
+      if (!item) {
+        return { status: 'not_found' };
+      }
+      var targetId = parsed.targets[id];
+      return client.completeMissing(items, targetId).then(function(response) {
+        var target = response.items.find(function(candidate) {
+          return candidate.id === targetId;
+        });
+        var confirmed = response.conflict === false && target && target.checked === true &&
+          typeof target.text === 'string' && !target.text.startsWith('[PERIODIC]');
+        var result = publish(response.items);
+        if (!confirmed) {
+          console.error('Google Keep note changed during a missing-item update; refreshed without confirming the request');
+        }
+        return { status: confirmed ? 'completed' : 'conflict', snapshot: result.snapshot };
+      });
+    });
+  }
+
+  return { refresh: refresh, setPeriodic: setPeriodic, completeMissing: completeMissing };
 }
 
 module.exports = createKeepSync;

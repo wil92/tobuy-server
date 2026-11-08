@@ -63,6 +63,22 @@ test('Keep helper refuses to change non-periodic checklist items', async functio
   assert.deepEqual((await keep.read()).items, original);
 });
 
+test('Keep helper completes only unchecked non-periodic items', async function(t) {
+  var keep = client();
+  t.after(function() { keep.close(); });
+  var original = (await keep.read()).items;
+  await assert.rejects(keep.completeMissing(original, 'milk-id'), /Invalid non-periodic checklist update/);
+  assert.deepEqual((await keep.read()).items, original);
+  var conflict = await keep.completeMissing([], 'bread-id');
+  assert.equal(conflict.conflict, true);
+  assert.deepEqual(conflict.items, original);
+  var result = await keep.completeMissing(original, 'bread-id');
+  assert.equal(result.conflict, false);
+  assert.deepEqual(result.items, [original[0], { id: 'bread-id', text: 'Bread', checked: true }]);
+  assert.deepEqual((await keep.read()).items, result.items);
+  await assert.rejects(keep.completeMissing(result.items, 'bread-id'), /Invalid non-periodic checklist update/);
+});
+
 test('Keep helper reports missing interpreter details', async function(t) {
   var keep = createKeepClient('/no/such/python', process.env);
   t.after(function() { keep.close(); });

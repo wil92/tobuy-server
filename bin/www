@@ -32,6 +32,7 @@ if (python.includes('/')) {
 }
 var keepClient = createKeepClient(python, process.env);
 var keepSync = createKeepSync(app.locals.tobuyStore, keepClient);
+app.locals.keepSync = keepSync;
 var pollTimer;
 var pollPending = false;
 var shuttingDown = false;

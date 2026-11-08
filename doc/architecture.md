@@ -11,8 +11,8 @@ protocol for the Arduino client.
   a list store for isolated integration tests.
 - `routes/health.js` handles `GET /health` with a JSON `{ "status": "ok" }`
   response for service liveness checks.
-- `routes/tobuy.js` handles `GET /tobuy` and returns the shared revisioned
-  list document.
+- `routes/tobuy.js` handles `GET /tobuy` and
+  `DELETE /tobuy/missing/{id}` to mark a non-periodic item done in Keep.
 - `routes/temperature.js` and `services/temperature.js` provide
   `GET /temperature` using Open-Meteo for the configured city; see
   [Temperature](temperature.md).
@@ -23,13 +23,13 @@ protocol for the Arduino client.
   `ws` library's automatic ping/pong handling.
 - `services/keep-checklist.js` extracts protocol items from the selected
   checklist, maps item IDs, and enforces protocol limits.
-- `services/keep-sync.js` serializes polls and Arduino changes, publishing only
+- `services/keep-sync.js` serializes polls and item changes, publishing only
   confirmed Keep state. `services/keep-client.js` manages the Python helper;
   `services/keep-worker.py` uses the unofficial `gkeepapi` client.
 - Other HTTP paths, including `/` and `/users`, are not part of the service and
   return Express's default 404 response.
 
-The shared list is an in-memory projection of the selected Keep note. Add or
-remove items in the note; the server has no public API for those operations.
+The shared list is an in-memory projection of the selected Keep note. Add,
+rename, or permanently delete items in the note.
 See the [Google Keep guide](google-keep.md) and
 [Arduino client integration](arduino-client.md) for limitations.

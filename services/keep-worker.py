@@ -63,14 +63,18 @@ def main():
             items = checklist_items(note)
             if request['operation'] == 'read':
                 response = {'items': items}
-            elif request['operation'] == 'write':
+            elif request['operation'] in ('write', 'complete_missing'):
                 if items != request['expected']:
                     response = {'items': items, 'conflict': True}
                 else:
                     matches = [item for item in note.items if item.id == request['id']]
-                    if (len(matches) != 1 or not matches[0].text.startswith('[PERIODIC]')
-                            or not isinstance(request['checked'], bool)):
-                        raise ValueError('Invalid periodic checklist update')
+                    if request['operation'] == 'write':
+                        if (len(matches) != 1 or not matches[0].text.startswith('[PERIODIC]')
+                                or not isinstance(request['checked'], bool)):
+                            raise ValueError('Invalid periodic checklist update')
+                    elif (len(matches) != 1 or matches[0].text.startswith('[PERIODIC]')
+                          or matches[0].checked or request.get('checked') is not True):
+                        raise ValueError('Invalid non-periodic checklist update')
                     matches[0].checked = request['checked']
                     keep.sync()
                     response = {'items': checklist_items(get_note(keep, note_id)), 'conflict': False}
