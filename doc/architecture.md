@@ -13,6 +13,9 @@ protocol for the Arduino client.
   response for service liveness checks.
 - `routes/tobuy.js` handles `GET /tobuy` and returns the shared revisioned
   list document.
+- `routes/temperature.js` and `services/temperature.js` provide
+  `GET /temperature` using Open-Meteo for the configured city; see
+  [Temperature](temperature.md).
 - `services/tobuy-store.js` owns the in-memory periodic and missing lists,
   validates protocol constraints, and emits change events.
 - `services/tobuy-websocket.js` attaches the `/ws` endpoint to the HTTP server,

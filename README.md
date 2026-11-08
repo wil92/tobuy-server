@@ -19,6 +19,7 @@ limitations.
   implementation status.
 - [Google Keep integration](doc/google-keep.md): credentials, note format,
   synchronization, and limitations.
+- [Temperature](doc/temperature.md): city configuration and current weather.
 - [Coding rules](doc/coding-rules.md): conventions for changes and tests.
 - [Express Senior agent](.github/agents/express-senior.agent.md): project
   workflows and skills.
