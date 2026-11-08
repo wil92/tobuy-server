@@ -4,6 +4,17 @@ function createKeepSync(store, client) {
   var items;
   var parsed;
   var queue = Promise.resolve();
+  var health = { ok: true, error: null };
+
+  function track(promise) {
+    return promise.then(function(response) {
+      health = { ok: true, error: null };
+      return response;
+    }, function(error) {
+      health = { ok: false, error: error.message };
+      throw error;
+    });
+  }
 
   function enqueue(action) {
     var result = queue.then(action);
@@ -24,7 +35,7 @@ function createKeepSync(store, client) {
 
   function refresh() {
     return enqueue(function() {
-      return client.read().then(function(response) {
+      return track(client.read()).then(function(response) {
         return publish(response.items);
       });
     });
@@ -34,11 +45,11 @@ function createKeepSync(store, client) {
     return enqueue(function() {
       var item = parsed && parsed.periodic.find(function(candidate) { return candidate.id === id; });
       if (!item || item.needed === needed || store.getSnapshot().revision === 4294967295) {
-        return client.read().then(function(response) {
+        return track(client.read()).then(function(response) {
           return publish(response.items);
         });
       }
-      return client.write(items, parsed.targets[id], !needed).then(function(response) {
+      return track(client.write(items, parsed.targets[id], !needed)).then(function(response) {
         var target = response.items.find(function(candidate) {
           return candidate.id === parsed.targets[id];
         });
@@ -61,7 +72,7 @@ function createKeepSync(store, client) {
         return { status: 'not_found' };
       }
       var targetId = parsed.targets[id];
-      return client.completeMissing(items, targetId).then(function(response) {
+      return track(client.completeMissing(items, targetId)).then(function(response) {
         var target = response.items.find(function(candidate) {
           return candidate.id === targetId;
         });
@@ -76,7 +87,11 @@ function createKeepSync(store, client) {
     });
   }
 
-  return { refresh: refresh, setPeriodic: setPeriodic, completeMissing: completeMissing };
+  function getHealth() {
+    return { ok: health.ok, error: health.error };
+  }
+
+  return { getHealth: getHealth, refresh: refresh, setPeriodic: setPeriodic, completeMissing: completeMissing };
 }
 
 module.exports = createKeepSync;

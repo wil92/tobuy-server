@@ -329,3 +329,25 @@ test('health endpoint supports HEAD and does not expose unsupported methods', as
   assert.equal(await getStatus(url, 'HEAD'), 200);
   assert.equal(await getStatus(url, 'POST'), 404);
 });
+
+test('health endpoint returns 503 while Keep is failing and recovers', async function(t) {
+  var healthy = false;
+  var application = app.createApp(createStore());
+  application.locals.keepSync = { getHealth: function() { return { ok: healthy, error: 'x' }; } };
+  var server = http.createServer(application);
+  var port = await listen(server);
+  t.after(function() {
+    return new Promise(function(resolve) {
+      server.close(resolve);
+    });
+  });
+
+  var url = 'http://127.0.0.1:' + port + '/health';
+  var response = await getJson(url);
+  assert.equal(response.statusCode, 503);
+  assert.deepEqual(response.json, { status: 'error', error: 'Google Keep integration is not working' });
+  healthy = true;
+  response = await getJson(url);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json, { status: 'ok' });
+});

@@ -342,3 +342,15 @@ test('WebSocket confirms only successful remote writes', async function(t) {
   assert.deepEqual(await rejected, updated);
   assert.equal(store.getSnapshot().periodic[0].needed, false);
 });
+
+test('sync health fails on Keep errors and recovers after success', async function() {
+  var client = fakeClient(note);
+  var sync = createKeepSync(createStore(), client);
+  assert.equal(sync.getHealth().ok, true);
+  client.offline(true);
+  await assert.rejects(sync.refresh(), /offline/);
+  assert.equal(sync.getHealth().ok, false);
+  client.offline(false);
+  await sync.refresh();
+  assert.deepEqual(sync.getHealth(), { ok: true, error: null });
+});

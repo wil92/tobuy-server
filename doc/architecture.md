@@ -9,8 +9,10 @@ protocol for the Arduino client.
   retries the Keep integration. It also accepts a named pipe.
 - `app.js` mounts the Arduino HTTP route and exposes an app factory that accepts
   a list store for isolated integration tests.
-- `routes/health.js` handles `GET /health` with a JSON `{ "status": "ok" }`
-  response for service liveness checks.
+- `routes/health.js` handles `GET /health` with `{ "status": "ok" }`, or
+  HTTP 503 `{ "status": "error", ... }` while the last Keep operation (auth,
+  request, helper call, or update) failed. `services/keep-sync.js` keeps this
+  status in memory; it returns to `ok` after the next successful operation.
 - `routes/tobuy.js` handles `GET /tobuy` and
   `DELETE /tobuy/missing/{id}` to mark a non-periodic item done in Keep.
 - `routes/temperature.js` and `services/temperature.js` provide
