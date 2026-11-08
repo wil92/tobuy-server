@@ -4,10 +4,36 @@
  * Module dependencies.
  */
 
+var path = require('path');
+var envResult = require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+if (envResult.error && envResult.error.code !== 'ENOENT') {
+  throw envResult.error;
+}
+
 var app = require('../app');
 var debug = require('debug')('tobuy-server:server');
 var http = require('http');
 var attachWebSocketServer = require('../services/tobuy-websocket');
+var createKeepClient = require('../services/keep-client');
+var createKeepSync = require('../services/keep-sync');
+
+['KEEP_EMAIL', 'KEEP_MASTER_TOKEN', 'KEEP_NOTE_ID'].forEach(function(name) {
+  if (!process.env[name]) {
+    throw new Error(name + ' must be configured');
+  }
+});
+var interval = Number(process.env.KEEP_POLL_INTERVAL_MS || '30000');
+if (!Number.isSafeInteger(interval) || interval < 1000 || interval > 2147483647) {
+  throw new Error('KEEP_POLL_INTERVAL_MS must be an integer between 1000 and 2147483647');
+}
+var python = process.env.KEEP_PYTHON || path.join(__dirname, '..', '.venv', 'bin', 'python');
+if (python.includes('/')) {
+  python = path.resolve(__dirname, '..', python);
+}
+var keepClient = createKeepClient(python, process.env);
+var keepSync = createKeepSync(app.locals.tobuyStore, keepClient);
+var pollTimer;
+var pollPending = false;
 
 /**
  * Get port from environment and store in Express.
@@ -21,15 +47,51 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
-attachWebSocketServer(server, app.locals.tobuyStore);
+var webSocketServer = attachWebSocketServer(server, app.locals.tobuyStore, keepSync.setPeriodic);
 
 /**
  * Listen on provided port, on all network interfaces.
  */
 
-server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
+server.on('close', function() {
+  clearInterval(pollTimer);
+  keepClient.close();
+});
+
+keepSync.refresh().then(function() {
+  server.listen(port);
+  pollTimer = setInterval(function() {
+    if (pollPending) {
+      return;
+    }
+    pollPending = true;
+    keepSync.refresh().catch(function(error) {
+      console.error('Google Keep refresh failed:', error.message);
+    }).finally(function() {
+      pollPending = false;
+    });
+  }, interval);
+}).catch(function(error) {
+  console.error('Google Keep initial sync failed:', error.message);
+  keepClient.close();
+  process.exitCode = 1;
+});
+
+['SIGINT', 'SIGTERM'].forEach(function(signal) {
+  process.on(signal, function() {
+    clearInterval(pollTimer);
+    keepClient.close();
+    webSocketServer.clients.forEach(function(client) { client.terminate(); });
+    webSocketServer.close();
+    if (server.listening) {
+      server.close();
+    } else {
+      process.exitCode = 0;
+    }
+  });
+});
 
 /**
  * Normalize a port into a number, string, or false.

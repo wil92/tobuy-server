@@ -5,10 +5,11 @@ An Express/Node.js server intended to support the
 display. The Arduino client fetches the list over HTTP, receives updates over
 WebSocket, and sends periodic-item changes from its touchscreen.
 
-The server provides the Arduino client's revisioned list endpoint and
-WebSocket protocol. Lists currently start empty in memory and are not
-persisted. See the [client integration guide](doc/arduino-client.md) for the
-protocol details and its security limitations.
+The server reads a selected Google Keep note and exposes the Arduino client's
+revisioned list endpoint and WebSocket protocol. See the
+[Google Keep guide](doc/google-keep.md) for setup and the
+[client integration guide](doc/arduino-client.md) for protocol and security
+limitations.
 
 ## Documentation
 
@@ -16,6 +17,8 @@ protocol details and its security limitations.
 - [Architecture](doc/architecture.md): current application and routes.
 - [Arduino client integration](doc/arduino-client.md): required protocol and
   implementation status.
+- [Google Keep integration](doc/google-keep.md): credentials, note format,
+  synchronization, and limitations.
 - [Coding rules](doc/coding-rules.md): conventions for changes and tests.
 - [Express Senior agent](.github/agents/express-senior.agent.md): project
   workflows and skills.

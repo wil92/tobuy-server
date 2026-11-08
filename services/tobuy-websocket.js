@@ -18,7 +18,8 @@ function isSetPeriodicMessage(message) {
     typeof message.needed === 'boolean';
 }
 
-function attachWebSocketServer(server, store) {
+function attachWebSocketServer(server, store, setPeriodic) {
+  setPeriodic = setPeriodic || store.setPeriodic;
   var webSocketServer = new WebSocket.Server({
     server: server,
     path: '/ws',
@@ -70,10 +71,16 @@ function attachWebSocketServer(server, store) {
         return;
       }
 
-      var result = store.setPeriodic(message.id, message.needed);
-      if (!result.changed) {
+      Promise.resolve().then(function() {
+        return setPeriodic(message.id, message.needed);
+      }).then(function(result) {
+        if (!result.changed) {
+          broadcastSnapshot();
+        }
+      }).catch(function(error) {
+        console.error('Arduino periodic update failed:', error.message);
         broadcastSnapshot();
-      }
+      });
     });
     socket.on('error', function(error) {
       console.error('Arduino WebSocket client error:', error);

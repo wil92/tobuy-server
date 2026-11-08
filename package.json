@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "debug": "~2.6.9",
+    "dotenv": "^16.6.1",
     "express": "~4.16.1",
     "ws": "^8.22.1"
   }

@@ -2,12 +2,21 @@
 
 ## Setup and run
 
-Install Node.js and npm, then from the repository root:
+Install Node.js 18 or newer, npm, and Python 3.10 or newer, then from the
+repository root:
 
 ```sh
 npm ci
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+chmod 600 .env
 npm start
 ```
+
+Before starting, configure the selected note and credentials in `.env` as
+described in the [Google Keep guide](google-keep.md). The server will not
+listen until its first Keep sync succeeds.
 
 The server listens on port `3000` by default. Override it with, for example,
 `PORT=3001 npm start`. The Arduino API is at `http://localhost:3000/tobuy` and
@@ -40,6 +49,10 @@ node --check routes/health.js
 node --check routes/tobuy.js
 node --check services/tobuy-store.js
 node --check services/tobuy-websocket.js
+node --check services/keep-client.js
+node --check services/keep-markdown.js
+node --check services/keep-sync.js
+.venv/bin/python -m py_compile services/keep-worker.py
 ```
 
 These checks do not replace a build or automated tests. For changes, add or

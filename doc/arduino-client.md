@@ -21,14 +21,14 @@ and WebSocket list messages use this complete JSON object shape:
 }
 ```
 
-Each process starts with empty in-memory `periodic` and `missing` arrays at
-revision 0. Lists are not persisted, and this server does not yet provide a
-public API to add or remove items. Internal server integrations can update the
-shared list store; changes increment the revision and are broadcast to
-connected clients. A `set_periodic` update applies an idempotent desired state
-and broadcasts the resulting complete list. Repeating the current state or
-requesting an unknown ID returns the current list without incrementing the
-revision.
+The server loads the selected Google Keep note before accepting connections.
+The in-memory revision resets on process restart; the note is the source of
+list data. Polling changes and confirmed `set_periodic` updates increment the
+revision and are broadcast to connected clients. A repeated state or unknown
+ID refreshes the note and broadcasts the current list without incrementing the
+revision unless the note changed. On a failed write the last known list is
+broadcast without confirming the requested state. Configure the note format,
+credentials, and polling as described in the [Google Keep guide](google-keep.md).
 
 The server validates the protocol's list limits: unsigned 32-bit revisions,
 at most 64 combined items, nonempty unique IDs of at most 32 UTF-8 bytes,
