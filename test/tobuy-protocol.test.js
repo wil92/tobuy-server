@@ -37,14 +37,16 @@ function getJson(url) {
   });
 }
 
-function getStatus(url) {
+function getStatus(url, method) {
   return new Promise(function(resolve, reject) {
-    http.get(url, function(response) {
+    var request = http.request(url, { method: method || 'GET' }, function(response) {
       response.resume();
       response.on('end', function() {
         resolve(response.statusCode);
       });
-    }).on('error', reject);
+    });
+    request.on('error', reject);
+    request.end();
   });
 }
 
@@ -311,4 +313,19 @@ test('health endpoint returns an OK status', async function(t) {
   assert.equal(response.statusCode, 200);
   assert.match(response.contentType, /^application\/json; charset=utf-8$/);
   assert.deepEqual(response.json, { status: 'ok' });
+});
+
+test('health endpoint supports HEAD and does not expose unsupported methods', async function(t) {
+  var server = http.createServer(app.createApp(createStore()));
+  var port = await listen(server);
+  var url = 'http://127.0.0.1:' + port + '/health';
+
+  t.after(function() {
+    return new Promise(function(resolve) {
+      server.close(resolve);
+    });
+  });
+
+  assert.equal(await getStatus(url, 'HEAD'), 200);
+  assert.equal(await getStatus(url, 'POST'), 404);
 });
